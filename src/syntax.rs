@@ -47,7 +47,7 @@ pub fn is_keyword(word: &str) -> bool {
 
 /// Quote `input_string` so that the quoted version is expanded or interpreted as the original
 /// string in the language variant set by `lang_variant`.
-pub fn quote(input_string: &str, lang_variant: LangVariant) -> Result<String, String> {
+pub fn quote(input_string: &str, lang_variant: LangVariant) -> Result<String, crate::Error> {
     let input_ffi = CString::new(input_string).unwrap();
     let resp = unsafe {
         bindings::HuskSyntaxQuote(
@@ -55,12 +55,11 @@ pub fn quote(input_string: &str, lang_variant: LangVariant) -> Result<String, St
             lang_variant.to_ffi_int(),
         )
     };
-    let res = unsafe { CString::from_raw(resp.r0).into_string().unwrap() };
 
-    if resp.r1 != 0 {
-        Ok(res)
+    if resp.r2 != 0 {
+        Err(crate::Error::new(resp.r1))
     } else {
-        Err(res)
+        Ok(unsafe { CString::from_raw(resp.r0).into_string().unwrap() })
     }
 }
 
@@ -124,11 +123,22 @@ impl Pos {
 
 impl Drop for Pos {
     fn drop(&mut self) {
-        unsafe { bindings::HuskDeleteGoItem(self.ptr) }
+        unsafe { bindings::HuskUtilDeleteGoItem(self.ptr) }
     }
 }
 
-/// A struct that holds the internal state of the parsing mechanism of a program.
+/// A shell source file.
+pub struct File {
+    ptr: usize,
+}
+
+impl Drop for File {
+    fn drop(&mut self) {
+        unsafe { bindings::HuskUtilDeleteGoItem(self.ptr) }
+    }
+}
+
+/// The internal state of the parsing mechanism of a program.
 pub struct Parser {
     ptr: usize,
 }
@@ -175,10 +185,41 @@ impl Parser {
 
         Self { ptr }
     }
+
+    /// Parse a shell program with an optional `name`. It returns the `File` handle to the program if no issues were encountered. `shell_code` should contain the byte representation of the shell program.
+    pub fn parse<T: Into<Vec<u8>>>(
+        &self,
+        shell_program: T,
+        name: Option<&str>,
+    ) -> Result<File, crate::Error> {
+        let shell_program_vec: Vec<u8> = shell_program.into();
+        let name_ptr: *mut libc::c_char;
+        let name_ffi = name.map(|name| CString::new(name).unwrap());
+        if let Some(string) = name_ffi {
+            name_ptr = string.as_ptr() as *mut libc::c_char;
+        } else {
+            name_ptr = std::ptr::null_mut();
+        }
+
+        let res = unsafe {
+            bindings::HuskSyntaxParserParse(
+                self.ptr,
+                shell_program_vec.as_ptr() as *mut u8,
+                shell_program_vec.len().try_into().unwrap(),
+                name_ptr,
+            )
+        };
+
+        if res.r2 != 0 {
+            Err(crate::Error::new(res.r1))
+        } else {
+            Ok(File { ptr: res.r0 })
+        }
+    }
 }
 
 impl Drop for Parser {
     fn drop(&mut self) {
-        unsafe { bindings::HuskDeleteGoItem(self.ptr) }
+        unsafe { bindings::HuskUtilDeleteGoItem(self.ptr) }
     }
 }

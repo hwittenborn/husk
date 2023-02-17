@@ -5,6 +5,7 @@ import (
     "github.com/hwittenborn/husk/util"
     "mvdan.cc/sh/v3/syntax"
     "runtime/cgo"
+	"bytes"
 )
 
 // Wrapper around `syntax.IsKeyword`.
@@ -25,9 +26,10 @@ func IsKeyword(word *ctypes.Char) bool {
 // - `langVariantInt`: The language variant.
 //
 // # Returns:
-// - `outputString`: The quoted string/error string.
-// - `isError`: Whether `outputString` is the quoted string or an error string.
-func Quote(inputString *ctypes.Char, langVariantInt ctypes.Int) (outputString *ctypes.Char, isError bool) {
+// - `outputString`: The quoted string.
+// - `errorPtr`: The pointer to the error, if one was found.
+// - `isError`: Whether the returned data is from an error or not.
+func Quote(inputString *ctypes.Char, langVariantInt ctypes.Int) (outputString *ctypes.Char, errorPtr ctypes.UintptrT, isError bool) {
 	langVariant := util.GetLangVariant(langVariantInt)
 	quotedString, err := syntax.Quote(ctypes.GoString(inputString), langVariant)
 
@@ -35,7 +37,7 @@ func Quote(inputString *ctypes.Char, langVariantInt ctypes.Int) (outputString *c
 		outputString = ctypes.CString(quotedString)
 		isError = false
 	} else {
-		outputString = ctypes.CString(err.Error())
+		errorPtr = ctypes.UintptrT(cgo.NewHandle(err))
 		isError = true
 	}
 
@@ -72,6 +74,40 @@ func NewParser(keepComments bool, stopAt *ctypes.Char, variantInt ctypes.Int) ct
 	}
 
 	return ctypes.UintptrT(cgo.NewHandle(parser))
+}
+
+// Wrapper around `syntax.Parser.Parse`
+//
+// # Arguments:
+// - `parser`: A pointer to the `syntax.Parser` object.
+// - `shellCode`: The byte array representation of the program.
+// - `shellCodeLen`: The length of the byte array.
+// - `name`: The name of the program. The pointer can be null if no name is desired.
+//
+// # Returns:
+// `file`: The parsed program.
+// `errorPtr`: The error that was encountered.
+// `isError`: Whether the returned data is an error.
+func ParserParse(parser ctypes.UintptrT, shellCode *ctypes.Uint8, shellCodeLen ctypes.Int, name *ctypes.Char) (file ctypes.UintptrT, errorPtr ctypes.UintptrT, isError bool) {
+	parserHandle := cgo.Handle(parser)
+	goParser := parserHandle.Value().(*syntax.Parser)
+	goByteArray := util.BuildByteArray(shellCode, shellCodeLen)
+	reader := bytes.NewReader(goByteArray)
+
+	var goName string
+	if name != nil {
+		goName = ctypes.GoString(name)
+	}
+
+	goFile, goError := goParser.Parse(reader, goName)
+	if goError != nil {
+		errorPtr = ctypes.UintptrT(cgo.NewHandle(goError))
+		isError = true
+	} else {
+		file = ctypes.UintptrT(cgo.NewHandle(goFile))
+		isError = false
+	}
+	return
 }
 
 // Wrapper around `syntax.NewPos`.

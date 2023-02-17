@@ -2,6 +2,7 @@ package main
 
 // #include <stdint.h>
 // #include <stdlib.h>
+// void my_func();
 import "C"
 
 import (
@@ -9,6 +10,7 @@ import (
 	"github.com/hwittenborn/husk/shell"
 	"github.com/hwittenborn/husk/syntax"
 	"github.com/hwittenborn/husk/util"
+	_ "github.com/hwittenborn/husk/interp"
 	"unsafe"
 )
 
@@ -59,6 +61,26 @@ func convertToRawUint(num ctypes.Uint) C.uint {
 	return *(*C.uint)(unsafe.Pointer(&num))
 }
 
+// Convert a `C.uint8_t` into `ctypes.Uint8`.
+func convertToCtypesUint8(num C.uint8_t) ctypes.Uint8 {
+	return *(*ctypes.Uint8)(unsafe.Pointer(&num))
+}
+
+// Convert a `ctypes.Uint8` into `C.uint8_t`.
+func convertToRawUint8(num ctypes.Uint8) C.uint8_t {
+	return *(*C.uint8_t)(unsafe.Pointer(&num))
+}
+
+// Convert a `*C.uint8_t` into `*ctypes.Uint8`.
+func convertToCtypesUint8Array(num *C.uint8_t) *ctypes.Uint8 {
+	return *(**ctypes.Uint8)(unsafe.Pointer(&num))
+}
+
+// Convert a `*ctypes.Uint8` into `*C.uint8_t`.
+func convertToRawUint8Array(num *ctypes.Uint8) *C.uint8_t {
+	return *(**C.uint8_t)(unsafe.Pointer(&num))
+}
+
 // Convert a `C.uintptr_t` into `ctypes.UintptrT`.
 func convertToCtypesUintptrT(num C.uintptr_t) ctypes.UintptrT {
 	return *(*ctypes.UintptrT)(unsafe.Pointer(&num))
@@ -72,44 +94,52 @@ func convertToRawUintptrT(num ctypes.UintptrT) C.uintptr_t {
 /********/
 /* UTIL */
 /********/
-//export HuskDeleteGoItem
-func HuskDeleteGoItem(ptr C.uintptr_t) {
+//export HuskUtilDeleteGoItem
+func HuskUtilDeleteGoItem(ptr C.uintptr_t) {
 	ctypesPtr := convertToCtypesUintptrT(ptr)
 	util.HuskDeleteGoItem(ctypesPtr)
 }
 
-//export HuskGetCStringFromArray
-func HuskGetCStringFromArray(goArray C.uintptr_t, itemPosition C.int) (cString *C.char) {
+//export HuskUtilGetCStringFromArray
+func HuskUtilGetCStringFromArray(goArray C.uintptr_t, itemPosition C.int) (cString *C.char) {
 	ctypesGoArray := convertToCtypesUintptrT(goArray)
 	ctypesItemPosition := convertToCtypesInt(itemPosition)
 	cString = convertToRawChar(util.HuskGetCStringFromArray(ctypesGoArray, ctypesItemPosition))
 	return
 }
 
+//export HuskUtilErrorString
+func HuskUtilErrorString(errorPtr C.uintptr_t) *C.char {
+	ctypesErrorPtr := convertToCtypesUintptrT(errorPtr)
+	goErrorString := util.ErrorString(ctypesErrorPtr)
+	return convertToRawChar(goErrorString)
+}
+
 /*********/
 /* SHELL */
 /*********/
 //export HuskShellExpand
-func HuskShellExpand(shellString *C.char, envVarsArray **C.char, envVarsArrayLength C.int) (outputString *C.char, isError bool) {
+func HuskShellExpand(shellString *C.char, envVarsArray **C.char, envVarsArrayLength C.int) (outputString *C.char, errorPtr C.uintptr_t) {
 	ctypesShellString := convertToCtypesChar(shellString)
 	ctypesEnvVarsArray := convertToCtypesCharArray(envVarsArray)
 	ctypesEnvVarsArrayLength := convertToCtypesInt(envVarsArrayLength)
-	ctypesOutputString, ctypesIsError := shell.Expand(ctypesShellString, ctypesEnvVarsArray, ctypesEnvVarsArrayLength)
+	ctypesOutputString, ctypesErrorPtr := shell.Expand(ctypesShellString, ctypesEnvVarsArray, ctypesEnvVarsArrayLength)
 
 	outputString = convertToRawChar(ctypesOutputString)
-	isError = ctypesIsError
+	errorPtr = convertToRawUintptrT(ctypesErrorPtr)
 	return
 }
 
 //export HuskShellFields
-func HuskShellFields(shellString *C.char, envVarsArray **C.char, envVarsArrayLength C.int) (goArray C.uintptr_t, errorString *C.char) {
+func HuskShellFields(shellString *C.char, envVarsArray **C.char, envVarsArrayLength C.int) (goArray C.uintptr_t, errorPtr C.uintptr_t, isError bool) {
 	ctypesShellString := convertToCtypesChar(shellString)
 	ctypesEnvVarsArray := convertToCtypesCharArray(envVarsArray)
 	ctypesEnvVarsArrayLength := convertToCtypesInt(envVarsArrayLength)
-	ctypesGoArray, ctypesErrorString := shell.Fields(ctypesShellString, ctypesEnvVarsArray, ctypesEnvVarsArrayLength)
+	ctypesGoArray, ctypesErrorString, ctypesIsError := shell.Fields(ctypesShellString, ctypesEnvVarsArray, ctypesEnvVarsArrayLength)
 
 	goArray = convertToRawUintptrT(ctypesGoArray)
-	errorString = convertToRawChar(ctypesErrorString)
+	errorPtr = convertToRawUintptrT(ctypesErrorString)
+	isError = ctypesIsError
 	return
 }
 
@@ -122,12 +152,13 @@ func HuskSyntaxIsKeyword(word *C.char) bool {
 }
 
 //export HuskSyntaxQuote
-func HuskSyntaxQuote(inputString *C.char, langVariant C.int) (outputString *C.char, isError bool) {
+func HuskSyntaxQuote(inputString *C.char, langVariant C.int) (outputString *C.char, errorPtr C.uintptr_t, isError bool) {
 	ctypesInputString := convertToCtypesChar(inputString)
 	ctypesInt := convertToCtypesInt(langVariant)
-	ctypesOutputString, ctypesIsError := syntax.Quote(ctypesInputString, ctypesInt)
+	ctypesOutputString, ctypesErrorPtr, ctypesIsError := syntax.Quote(ctypesInputString, ctypesInt)
 
 	outputString = convertToRawChar(ctypesOutputString)
+	errorPtr = convertToRawUintptrT(ctypesErrorPtr)
 	isError = ctypesIsError
 	return
 }
@@ -143,6 +174,20 @@ func HuskSyntaxNewParser(keepComments bool, stopAt *C.char, variantInt C.int) C.
 	ctypesVariantInt := convertToCtypesInt(variantInt)
 
 	return convertToRawUintptrT(syntax.NewParser(keepComments, ctypesStopAt, ctypesVariantInt))
+}
+
+//export HuskSyntaxParserParse
+func HuskSyntaxParserParse(parser C.uintptr_t, shellCode *C.uint8_t, shellCodeLen C.int, name *C.char) (file C.uintptr_t, errorPtr C.uintptr_t, isError bool) {
+	ctypesParser := convertToCtypesUintptrT(parser)
+	ctypesShellCode := convertToCtypesUint8Array(shellCode)
+	ctypesShellCodeLen := convertToCtypesInt(shellCodeLen)
+	ctypesName := convertToCtypesChar(name)
+
+	ctypesFile, ctypesErrorPtr, ctypesIsError := syntax.ParserParse(ctypesParser, ctypesShellCode, ctypesShellCodeLen, ctypesName)
+	file = convertToRawUintptrT(ctypesFile)
+	errorPtr = convertToRawUintptrT(ctypesErrorPtr)
+	isError = ctypesIsError
+	return
 }
 
 //export HuskSyntaxNewPos

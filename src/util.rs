@@ -9,7 +9,7 @@ pub(crate) unsafe fn go_to_rust_string_vec(array_ptr: usize) -> Vec<String> {
     let mut rust_vec = vec![];
 
     loop {
-        let char_ptr = bindings::HuskGetCStringFromArray(array_ptr, index);
+        let char_ptr = bindings::HuskUtilGetCStringFromArray(array_ptr, index);
 
         if char_ptr.is_null() {
             break;
@@ -19,7 +19,7 @@ pub(crate) unsafe fn go_to_rust_string_vec(array_ptr: usize) -> Vec<String> {
         index += 1;
     }
 
-    bindings::HuskDeleteGoItem(array_ptr);
+    bindings::HuskUtilDeleteGoItem(array_ptr);
     rust_vec
 }
 

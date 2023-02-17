@@ -23,6 +23,13 @@ func HuskError(errorString string, huskDefined bool) *ctypes.Char {
         return ctypes.CString(huskErrorString)
 }
 
+// Get the error string from an error.
+func ErrorString(errorPtr ctypes.UintptrT) *ctypes.Char {
+        errorPtrHandle := cgo.Handle(errorPtr)
+        goErrorPtr := errorPtrHandle.Value().(error)
+        return ctypes.CString(goErrorPtr.Error())
+}
+
 // Build a Go string array from a C string array.
 func BuildStringArray(stringArray **ctypes.Char, stringArraySize ctypes.Int) []string {
         var goCStringArray []*ctypes.Char = unsafe.Slice(stringArray, stringArraySize)
@@ -35,6 +42,17 @@ func BuildStringArray(stringArray **ctypes.Char, stringArraySize ctypes.Int) []s
         return goStringArray
 }
 
+// Build a go byte array from a C byte array.
+func BuildByteArray(byteArray *ctypes.Uint8, byteArraySize ctypes.Int) []byte {
+        var goCByteArray []ctypes.Uint8 = unsafe.Slice(byteArray, byteArraySize)
+        var goByteArray []byte
+
+        for _, item := range goCByteArray {
+                goByteArray = append(goByteArray, byte(item))
+        }
+
+        return goByteArray
+}
 // Convert an array of environment variables into a map of key-value pairs.
 func EnvListToEnvMap(envList []string) map[string]string {
 	envMap := make(map[string]string)

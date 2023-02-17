@@ -27,7 +27,7 @@ use std::{collections::HashMap, ffi::CString};
 pub fn expand<S: AsRef<str>>(
     shell_string: &str,
     env_vars: HashMap<S, S>,
-) -> Result<String, String> {
+) -> Result<String, crate::Error> {
     let shell_string_ffi = CString::new(shell_string).unwrap();
     let mut env_vec: Vec<CString> = vec![];
 
@@ -49,11 +49,10 @@ pub fn expand<S: AsRef<str>>(
         )
     };
 
-    let res = unsafe { CString::from_raw(resp.r0).into_string().unwrap() };
-    if resp.r1 == 0 {
-        Ok(res)
+    if !resp.r0.is_null() {
+        Ok(unsafe { CString::from_raw(resp.r0).into_string().unwrap() })
     } else {
-        Err(res)
+        Err(crate::Error::new(resp.r1))
     }
 }
 
@@ -68,7 +67,7 @@ pub fn expand<S: AsRef<str>>(
 pub fn fields<S: AsRef<str>>(
     shell_string: &str,
     env_vars: HashMap<S, S>,
-) -> Result<Vec<String>, String> {
+) -> Result<Vec<String>, crate::Error> {
     let shell_string_ffi = CString::new(shell_string).unwrap();
 
     let mut env_vec: Vec<CString> = vec![];
@@ -91,9 +90,9 @@ pub fn fields<S: AsRef<str>>(
         )
     };
 
-    if !resp.r1.is_null() {
-        Err(unsafe { CString::from_raw(resp.r1).into_string().unwrap() })
-    } else {
+    if resp.r2 != 0 {
         Ok(unsafe { util::go_to_rust_string_vec(resp.r0) })
+    } else {
+        Err(crate::Error::new(resp.r1))
     }
 }
