@@ -5,6 +5,7 @@ import (
     "strings"
     "unsafe"
     "runtime/cgo"
+    shSyntax "mvdan.cc/sh/v3/syntax"
 )
 
 // Return an error. These should be handled in the `husk` Rust crate.
@@ -76,4 +77,26 @@ func HuskGetCStringFromArray(goArray ctypes.UintptrT, itemPosition ctypes.Int) (
         }
 
         return
+}
+
+// Get the `syntax.LangVariant` from an integer.
+func GetLangVariant(langVariantInt ctypes.Int) shSyntax.LangVariant {
+        var langVariant shSyntax.LangVariant
+
+        switch langVariant {
+        case 0:
+                langVariant = shSyntax.LangBash
+        case 1:
+                langVariant = shSyntax.LangPOSIX
+        case 2:
+                langVariant = shSyntax.LangMirBSDKorn
+        case 3:
+                langVariant = shSyntax.LangBats
+        case 4:
+                langVariant = shSyntax.LangAuto
+        default:
+                panic("Invalid language variant supplied: " + string(langVariant))
+        }
+
+	return langVariant
 }

@@ -27,12 +27,15 @@ fn main() {
         .allowlist_function("HuskShellExpand")
         .allowlist_function("HuskShellFields")
         .allowlist_function("HuskSyntaxIsKeyword")
+        .allowlist_function("HuskSyntaxNewParser")
+        .allowlist_function("HuskSyntaxNewPos")
+        .allowlist_function("HuskSyntaxPosAfter")
+        .allowlist_function("HuskSyntaxPosCol")
+        .allowlist_function("HuskSyntaxPosIsValid")
+        .allowlist_function("HuskSyntaxPosLine")
+        .allowlist_function("HuskSyntaxPosOffset")
         .allowlist_function("HuskSyntaxQuote")
         .allowlist_function("HuskSyntaxValidName")
-        /*.allowlist_var("HUSK_LANG_VARIANT_BASH")
-        .allowlist_var("HUSK_LANG_VARIANT_POSIX")
-        .allowlist_var("HUSK_LANG_VARIANT_MKSH")
-        .allowlist_var("HUSK_LANG_VARIANT_BATS")*/
         .generate()
         .unwrap();
     bindings.write_to_file("src/bindings.rs").unwrap();

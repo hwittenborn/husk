@@ -1,4 +1,3 @@
-// Sadly we have to include all of our code inside of one file, because cgo doesn't allow using C types across different files :P.
 package main
 
 // #include <stdint.h>
@@ -18,6 +17,8 @@ func main() {}
 /****************/
 /* C TYPE UTILS */
 /****************/
+// Go doesn't allow using a C type across packages, so we have to manually convert between one that other packages in this use and one that this package uses directly.
+
 // Convert a `*C.char` into `*ctypes.Char`.
 func convertToCtypesChar(char *C.char) *ctypes.Char {
 	return *(**ctypes.Char)(unsafe.Pointer(&char))
@@ -46,6 +47,16 @@ func convertToCtypesInt(num C.int) ctypes.Int {
 // Convert a `ctypes.Int` into `C.int`.
 func convertToRawInt(num ctypes.Int) C.int {
 	return *(*C.int)(unsafe.Pointer(&num))
+}
+
+// Convert a `C.uint` into `ctypes.Uint`.
+func convertToCtypesUint(num C.uint) ctypes.Uint {
+	return *(*ctypes.Uint)(unsafe.Pointer(&num))
+}
+
+// Convert a `ctypes.Uint` into `C.uint`.
+func convertToRawUint(num ctypes.Uint) C.uint {
+	return *(*C.uint)(unsafe.Pointer(&num))
 }
 
 // Convert a `C.uintptr_t` into `ctypes.UintptrT`.
@@ -124,4 +135,53 @@ func HuskSyntaxQuote(inputString *C.char, langVariant C.int) (outputString *C.ch
 //export HuskSyntaxValidName
 func HuskSyntaxValidName(value *C.char) bool {
 	return syntax.ValidName(convertToCtypesChar(value))
+}
+
+//export HuskSyntaxNewParser
+func HuskSyntaxNewParser(keepComments bool, stopAt *C.char, variantInt C.int) C.uintptr_t {
+	ctypesStopAt := convertToCtypesChar(stopAt)
+	ctypesVariantInt := convertToCtypesInt(variantInt)
+
+	return convertToRawUintptrT(syntax.NewParser(keepComments, ctypesStopAt, ctypesVariantInt))
+}
+
+//export HuskSyntaxNewPos
+func HuskSyntaxNewPos(offset, line, column C.uint) C.uintptr_t {
+	ctypesOffset := convertToCtypesUint(offset)
+	ctypesLine := convertToCtypesUint(line)
+	ctypesColumn := convertToCtypesUint(column)
+
+	return convertToRawUintptrT(syntax.NewPos(ctypesOffset, ctypesLine, ctypesColumn))
+}
+
+//export HuskSyntaxPosAfter
+func HuskSyntaxPosAfter(pos1, pos2 C.uintptr_t) bool {
+	ctypesPos1 := convertToCtypesUintptrT(pos1)
+	ctypesPos2 := convertToCtypesUintptrT(pos2)
+
+	return syntax.PosAfter(ctypesPos1, ctypesPos2)
+}
+
+//export HuskSyntaxPosCol
+func HuskSyntaxPosCol(pos C.uintptr_t) C.uint {
+	ctypesPos := convertToCtypesUintptrT(pos)
+	return convertToRawUint(syntax.PosCol(ctypesPos))
+}
+
+//export HuskSyntaxPosIsValid
+func HuskSyntaxPosIsValid(pos C.uintptr_t) bool {
+	ctypesPos := convertToCtypesUintptrT(pos)
+	return syntax.PosIsValid(ctypesPos)
+}
+
+//export HuskSyntaxPosLine
+func HuskSyntaxPosLine(pos C.uintptr_t) C.uint {
+	ctypesPos := convertToCtypesUintptrT(pos)
+	return convertToRawUint(syntax.PosLine(ctypesPos))
+}
+
+//export HuskSyntaxPosOffset
+func HuskSyntaxPosOffset(pos C.uintptr_t) C.uint {
+	ctypesPos := convertToCtypesUintptrT(pos)
+	return convertToRawUint(syntax.PosOffset(ctypesPos))
 }
