@@ -29,10 +29,10 @@ fn main() {
         .allowlist_function("HuskSyntaxIsKeyword")
         .allowlist_function("HuskSyntaxQuote")
         .allowlist_function("HuskSyntaxValidName")
-        .allowlist_var("HUSK_LANG_VARIANT_BASH")
+        /*.allowlist_var("HUSK_LANG_VARIANT_BASH")
         .allowlist_var("HUSK_LANG_VARIANT_POSIX")
         .allowlist_var("HUSK_LANG_VARIANT_MKSH")
-        .allowlist_var("HUSK_LANG_VARIANT_BATS")
+        .allowlist_var("HUSK_LANG_VARIANT_BATS")*/
         .generate()
         .unwrap();
     bindings.write_to_file("src/bindings.rs").unwrap();

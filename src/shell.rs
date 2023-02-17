@@ -50,7 +50,7 @@ pub fn expand<S: AsRef<str>>(
     };
 
     let res = unsafe { CString::from_raw(resp.r0).into_string().unwrap() };
-    if resp.r1 != 0 {
+    if resp.r1 == 0 {
         Ok(res)
     } else {
         Err(res)

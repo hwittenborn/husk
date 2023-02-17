@@ -1,0 +1,79 @@
+package util
+
+import (
+    "github.com/hwittenborn/husk/ctypes"
+    "strings"
+    "unsafe"
+    "runtime/cgo"
+)
+
+// Return an error. These should be handled in the `husk` Rust crate.
+func HuskError(errorString string, huskDefined bool) *ctypes.Char {
+        var huskErrorString string
+
+        if huskDefined {
+                huskErrorString = "husk-err:"
+        } else {
+                huskErrorString = "err:"
+        }
+
+        huskErrorString += errorString
+
+        return ctypes.CString(huskErrorString)
+}
+
+// Build a Go string array from a C string array.
+func BuildStringArray(stringArray **ctypes.Char, stringArraySize ctypes.Int) []string {
+        var goCStringArray []*ctypes.Char = unsafe.Slice(stringArray, stringArraySize)
+        var goStringArray []string                   
+         
+        for _, item := range goCStringArray {
+                goStringArray = append(goStringArray, ctypes.GoString(item))
+        }
+
+        return goStringArray
+}
+
+// Convert an array of environment variables into a map of key-value pairs.
+func EnvListToEnvMap(envList []string) map[string]string {
+	envMap := make(map[string]string)
+
+	for _, keyValue := range envList {
+		parts := strings.Split(keyValue, "=")
+		key := parts[0]
+		value := strings.Join(parts[1:], "=")
+
+		envMap[key] = value
+	}
+
+	return envMap
+}
+
+// Free the memory for an item from Go.
+//
+// # Arguments:
+// - `ptr`: The pointer to the Go item.
+func HuskDeleteGoItem(ptr ctypes.UintptrT) {
+        handle := cgo.Handle(ptr)
+        handle.Delete()
+}
+
+// Get a C string out of a Go string array.
+//
+// # Arguments:
+// - `goArray`: The pointer to the Go array.
+// - `itemPosition`: The position of the item to return.
+//
+// # Returns:
+// - `cString`: A pointer to the C string. Is null if `itemPosition` isn't a valid index in the list.
+func HuskGetCStringFromArray(goArray ctypes.UintptrT, itemPosition ctypes.Int) (cString *ctypes.Char) {
+        arrayHandle := cgo.Handle(goArray)
+        array := arrayHandle.Value().([]string)
+        goItemPosition := int(itemPosition)
+
+        if !(goItemPosition > (len(array) - 1)) {
+                cString = ctypes.CString(array[goItemPosition])
+        }
+
+        return
+}
