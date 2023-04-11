@@ -1,7 +1,13 @@
 [package]
 name = "husk"
-version = "0.1.0"
+version = "0.1.1"
+authors = ["Hunter Wittenborn <hunter@hunterwittenborn.com>"]
 edition = "2021"
+description = "Rust bindings for the mvdan.cc/sh Golang library"
+repository = "https://github.com/hwittenborn/husk"
+license = "BSD-3-Clause"
+keywords = ["mvdan", "shell", "sh", "bash", "bats"]
+categories = ["api-bindings", "parsing"]
 
 [build-dependencies]
 bindgen = "0.63.0"
