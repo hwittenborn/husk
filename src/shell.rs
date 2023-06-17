@@ -1,99 +1,46 @@
-//! Higher-level abstractions to the [`syntax`](mod@crate::syntax), [`expand`](mod@crate::expand), and [`interp`](mod@crate::interp) modules.
-use crate::{bindings, util};
-use std::{collections::HashMap, ffi::CString};
+//! Parsing and formatting of shell programs. Supports POSIX Shell, Bash, and mksh.
+use crate::{bindings, ctypes, util, EnvMap, Error};
+use std::ffi::{self, CString};
 
 /// Perform shell expansion on `shell_string` as if it were within double quotes, using `env_vars`
 /// to resolve variables. This includes parameter expansion, arithmetic expansion, and quote
 /// removal.
 ///
-/// System environment variables can be used for expansion by using the [`util::env_map`]
-/// function.
-///
 /// Command substitutions like `$(echo foo)` aren't supported to avoid running arbitrary code. To
-/// support those, use an interpreter from the [`expand`](mod@crate::expand) module.
+/// support those, use an interpreter from the `expand` module.
 ///
-/// If the input string has invalid syntax, [`Err`] is returned.
-///
-/// # Example
-/// ```rust
-/// use std::env;
-/// use husk::{shell, util};
-///
-/// env::set_var("NAME", "Foo Bar");
-/// let env_map = util::env_map();
-/// let expanded_string = shell::expand("Hello, ${NAME}!", env_map).unwrap();
-/// assert_eq!(expanded_string, "Hello, Foo Bar!");
-/// ```
-pub fn expand<S: AsRef<str>>(
-    shell_string: &str,
-    env_vars: HashMap<S, S>,
-) -> Result<String, String> {
-    let shell_string_ffi = CString::new(shell_string).unwrap();
-    let mut env_vec: Vec<CString> = vec![];
+/// If the input string has invalid syntax, [`Error::Expansion`] is returned.
+#[husk_proc::unsafe_wrapper]
+pub fn expand(shell_string: &str, env_vars: EnvMap) -> crate::Result<String> {
+    let c_shell_string = CString::new(shell_string).unwrap();
+    let boxed_env_vars = Box::new(env_vars);
+    let env_vars_ptr = Box::into_raw(boxed_env_vars) as *mut ffi::c_void;
+    let resp = bindings::HuskShellExpand(c_shell_string.as_ptr() as *mut ffi::c_char, env_vars_ptr);
 
-    for (key, value) in env_vars {
-        let env_var_ffi =
-            CString::new(format!("{}={}", key.as_ref(), value.as_ref()).as_str()).unwrap();
-        env_vec.push(env_var_ffi);
-    }
-
-    let env_vec_ptrs: Vec<*mut libc::c_char> = env_vec
-        .iter()
-        .map(|string| string.as_ptr() as *mut libc::c_char)
-        .collect();
-    let resp = unsafe {
-        bindings::HuskShellExpand(
-            shell_string_ffi.as_ptr() as *mut libc::c_char,
-            env_vec_ptrs.as_ptr() as *mut *mut libc::c_char,
-            env_vec_ptrs.len().try_into().unwrap(),
-        )
-    };
-
-    let res = unsafe { CString::from_raw(resp.r0).into_string().unwrap() };
-    if resp.r1 == 0 {
-        Ok(res)
+    if resp.r1 == ctypes::HUSK_SHELL_EXPAND_STRING {
+        let resp_str = bindings::HuskMiscStringerToString(resp.r0);
+        Ok(CString::from_raw(resp_str).into_string().unwrap())
     } else {
-        Err(res)
+        Err(util::error_obj_to_rust(resp.r0, resp.r1))
     }
 }
 
-/// Perform shell expansion on `shell_string` as if it were command arguments, using `env_vars` to
-/// resolve variables. It is similar to [`expand`], but includes brace expansion, tilde expansion,
-/// and globbing.
+/// Perform shell expansion on `shell_string` as if it were a command's arguments, using `env_vars`
+/// to resolve variables. It is similar to [`expand`], but includes brace expansion, tilde
+/// expansion, and globbing.
 ///
-/// System environment variables can be used for expansion by using the [`util::env_map`]
-/// function.
-///
-/// If the input string has invalid syntax, [`Err`] is returned.
-pub fn fields<S: AsRef<str>>(
-    shell_string: &str,
-    env_vars: HashMap<S, S>,
-) -> Result<Vec<String>, String> {
-    let shell_string_ffi = CString::new(shell_string).unwrap();
+/// If the input string has invalid syntax, [`Error::Expansion`] is returned.
+#[husk_proc::unsafe_wrapper]
+pub fn fields(shell_string: &str, env_vars: EnvMap) -> crate::Result<Vec<String>> {
+    let c_shell_string = CString::new(shell_string).unwrap();
+    let boxed_env_vars = Box::new(env_vars);
+    let env_vars_ptr = Box::into_raw(boxed_env_vars) as *mut ffi::c_void;
+    
+    let resp = bindings::HuskShellFields(c_shell_string.as_ptr() as *mut ffi::c_char, env_vars_ptr);
 
-    let mut env_vec: Vec<CString> = vec![];
-
-    for (key, value) in env_vars {
-        let env_var_ffi =
-            CString::new(format!("{}={}", key.as_ref(), value.as_ref()).as_str()).unwrap();
-        env_vec.push(env_var_ffi);
-    }
-
-    let env_vec_ptrs: Vec<*mut libc::c_char> = env_vec
-        .iter()
-        .map(|string| string.as_ptr() as *mut libc::c_char)
-        .collect();
-    let resp = unsafe {
-        bindings::HuskShellFields(
-            shell_string_ffi.as_ptr() as *mut libc::c_char,
-            env_vec_ptrs.as_ptr() as *mut *mut libc::c_char,
-            env_vec_ptrs.len().try_into().unwrap(),
-        )
-    };
-
-    if !resp.r1.is_null() {
-        Err(unsafe { CString::from_raw(resp.r1).into_string().unwrap() })
+    if resp.r1 == ctypes::HUSK_SHELL_FIELDS_STRINGS {
+        Ok(util::go_to_rust_string_vec(resp.r0))
     } else {
-        Ok(unsafe { util::go_to_rust_string_vec(resp.r0) })
+        Err(util::error_obj_to_rust(resp.r0, resp.r1))
     }
 }

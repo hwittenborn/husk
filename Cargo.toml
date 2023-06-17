@@ -1,11 +1,28 @@
-[package]
-name = "husk"
+[workspace]
+members = ["husk-proc"]
+
+[workspace.package]
 version = "0.1.3"
 authors = ["Hunter Wittenborn <hunter@hunterwittenborn.com>"]
 edition = "2021"
-description = "Rust bindings for the mvdan.cc/sh Golang library"
 repository = "https://github.com/hwittenborn/husk"
 license = "BSD-3-Clause"
+
+[workspace.dependencies]
+libc = "0.2.139"
+husk-proc = { version = "=0.1.3", path = "./husk-proc" }
+quote = "1.0.28"
+thiserror = "1.0.40"
+syn = { version = "2.0.18", features = ["full", "printing"] }
+
+[package]
+name = "husk"
+version.workspace = true
+authors.workspace = true
+edition.workspace = true
+repository.workspace = true
+license.workspace = true
+description = "Rust bindings for the mvdan.cc/sh Golang library"
 keywords = ["mvdan", "shell", "sh", "bash", "bats"]
 categories = ["api-bindings", "parsing"]
 
@@ -13,4 +30,6 @@ categories = ["api-bindings", "parsing"]
 bindgen = "0.63.0"
 
 [dependencies]
-libc = "0.2.139"
+libc.workspace = true
+husk-proc.workspace = true
+thiserror.workspace = true

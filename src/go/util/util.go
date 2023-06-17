@@ -1,102 +1,103 @@
 package util
 
+// #include "../husk.h"
+import "C"
+
 import (
     "github.com/hwittenborn/husk/ctypes"
-    "strings"
+    "mvdan.cc/sh/v3/expand"
+    "mvdan.cc/sh/v3/interp"
+    "mvdan.cc/sh/v3/syntax"
     "unsafe"
     "runtime/cgo"
-    shSyntax "mvdan.cc/sh/v3/syntax"
 )
 
-// Return an error. These should be handled in the `husk` Rust crate.
-func HuskError(errorString string, huskDefined bool) *ctypes.Char {
-        var huskErrorString string
-
-        if huskDefined {
-                huskErrorString = "husk-err:"
-        } else {
-                huskErrorString = "err:"
-        }
-
-        huskErrorString += errorString
-
-        return ctypes.CString(huskErrorString)
+// An error struct for use by `rustReader.Read`.
+type RustReaderError struct {
+        // A pointer to the error object.
+        ErrObj unsafe.Pointer
 }
 
-// Build a Go string array from a C string array.
-func BuildStringArray(stringArray **ctypes.Char, stringArraySize ctypes.Int) []string {
-        var goCStringArray []*ctypes.Char = unsafe.Slice(stringArray, stringArraySize)
-        var goStringArray []string                   
-         
-        for _, item := range goCStringArray {
-                goStringArray = append(goStringArray, ctypes.GoString(item))
-        }
-
-        return goStringArray
+func (err RustReaderError) Error() string {
+        panic("`github.com/hwittenborn/husk/syntax/rustReaderError` doesn't have a Display implementation")
 }
 
-// Convert an array of environment variables into a map of key-value pairs.
-func EnvListToEnvMap(envList []string) map[string]string {
-	envMap := make(map[string]string)
+// Convert a Rust `HashMap<String, String>` into a go `map[string]string`.
+func RustStringMapToGo(hmap unsafe.Pointer) map[string]string {
+	index := C.uint(0)
+	var keys []string
 
-	for _, keyValue := range envList {
-		parts := strings.Split(keyValue, "=")
-		key := parts[0]
-		value := strings.Join(parts[1:], "=")
+	for {
+		key := C.HuskRustGetHashMapKey(hmap, index)
+		if key == nil {
+			break
+		}
 
-		envMap[key] = value
+		keys = append(keys, C.GoString(key))
+		index += 1
 	}
 
-	return envMap
-}
+	stringMap := make(map[string]string)
 
-// Free the memory for an item from Go.
-//
-// # Arguments:
-// - `ptr`: The pointer to the Go item.
-func HuskDeleteGoItem(ptr ctypes.UintptrT) {
-        handle := cgo.Handle(ptr)
-        handle.Delete()
-}
+	for _, key := range keys {
+		value := C.HuskRustGetHashMapValue(hmap, C.CString(key))
+		stringMap[key] = C.GoString(value)
+	}
 
-// Get a C string out of a Go string array.
-//
-// # Arguments:
-// - `goArray`: The pointer to the Go array.
-// - `itemPosition`: The position of the item to return.
-//
-// # Returns:
-// - `cString`: A pointer to the C string. Is null if `itemPosition` isn't a valid index in the list.
-func HuskGetCStringFromArray(goArray ctypes.UintptrT, itemPosition ctypes.Int) (cString *ctypes.Char) {
-        arrayHandle := cgo.Handle(goArray)
-        array := arrayHandle.Value().([]string)
-        goItemPosition := int(itemPosition)
-
-        if !(goItemPosition > (len(array) - 1)) {
-                cString = ctypes.CString(array[goItemPosition])
-        }
-
-        return
+	return stringMap
 }
 
 // Get the `syntax.LangVariant` from an integer.
-func GetLangVariant(langVariantInt ctypes.Int) shSyntax.LangVariant {
-        var langVariant shSyntax.LangVariant
+func GetLangVariant(langVariant ctypes.Int) syntax.LangVariant {
+        var shLangVariant syntax.LangVariant
+	cLangVariant := C.int(langVariant)
 
-        switch langVariant {
-        case 0:
-                langVariant = shSyntax.LangBash
-        case 1:
-                langVariant = shSyntax.LangPOSIX
-        case 2:
-                langVariant = shSyntax.LangMirBSDKorn
-        case 3:
-                langVariant = shSyntax.LangBats
-        case 4:
-                langVariant = shSyntax.LangAuto
+        switch cLangVariant {
+        case C.HUSK_LANG_BASH:
+                shLangVariant = syntax.LangBash
+        case C.HUSK_LANG_POSIX:
+                shLangVariant = syntax.LangPOSIX
+        case C.HUSK_LANG_MKSH:
+                shLangVariant = syntax.LangMirBSDKorn
+        case C.HUSK_LANG_BATS:
+                shLangVariant = syntax.LangBats
+        case C.HUSK_LANG_AUTO:
+                shLangVariant = syntax.LangAuto
         default:
-                panic("Invalid language variant supplied: " + string(langVariant))
+                panic("Invalid language variant supplied: " + string(cLangVariant))
         }
 
-	return langVariant
+	return shLangVariant
+}
+
+// Convert an `error` interface into a Go pointer, and the error type as an integer.
+func RustError(err error) (cgo.Handle, int) {
+	var typeInt C.int
+
+	switch errType := err.(type) {
+	case RustReaderError:
+		typeInt = C.HUSK_ERROR_IO
+	case expand.UnexpectedCommandError:
+		typeInt = C.HUSK_ERROR_UNEXPECTED_COMMAND
+	case expand.UnsetParameterError:
+		typeInt = C.HUSK_ERROR_UNSET_PARAMETER
+	case syntax.LangError:
+		typeInt = C.HUSK_ERROR_LANG
+	case syntax.ParseError:
+		typeInt = C.HUSK_ERROR_PARSE
+	case *syntax.QuoteError:
+		// Dereference the QuoteError pointer so that we aren't returning a handle to a pointer.
+		err = *errType
+		typeInt = C.HUSK_ERROR_QUOTE
+	default:
+		_, isExitStatus := interp.IsExitStatus(err)
+
+		if isExitStatus {
+			typeInt = C.HUSK_ERROR_EXIT_STATUS
+		} else {
+			typeInt = C.HUSK_ERROR_UNKNOWN
+		}
+	}
+
+	return cgo.NewHandle(err), int(typeInt)
 }

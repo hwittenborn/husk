@@ -15,10 +15,11 @@ fn main() {
         return;
     }
 
+    // Copy our 'husk.h' file into `out_dir`, as `bindgen` needs it to generate stuff.
+    fs::copy("husk.h", out_path.join("husk.h")).unwrap();
+
     let status = Command::new("go")
-        .args(["build", "-buildmode=c-archive", "-o"])
-        .arg(&format!("{out_dir}/libhusk.a"))
-        .arg("main.go")
+        .args(["build", "-buildmode=c-archive", "-o", "libhusk.a", "."])
         .status()
         .expect("`go build` failed. Is `go` installed and on the latest version?");
 
@@ -26,29 +27,18 @@ fn main() {
         panic!("`go build` failed. Is `go` on the latest version?");
     }
 
-    env::set_current_dir("../../").unwrap();
-    println!("cargo:rustc-link-search=native={out_dir}");
+    println!("cargo:rustc-link-search={out_dir}");
+    // We need to remove this before merge, it's working to test Koca for some reason though ???
+    println!("cargo:rustc-link-search=/home/hunter/Documents/Git/GitHub/hwittenborn/husk/src/go/");
     println!("cargo:rustc-link-lib=static=husk");
 
-    let bindings = bindgen::Builder::default()
-        .header(format!("{out_dir}/libhusk.h"))
-        .allowlist_function("HuskDeleteGoItem")
-        .allowlist_function("HuskGetCStringFromArray")
-        .allowlist_function("HuskShellExpand")
-        .allowlist_function("HuskShellFields")
-        .allowlist_function("HuskSyntaxIsKeyword")
-        .allowlist_function("HuskSyntaxNewParser")
-        .allowlist_function("HuskSyntaxNewPos")
-        .allowlist_function("HuskSyntaxPosAfter")
-        .allowlist_function("HuskSyntaxPosCol")
-        .allowlist_function("HuskSyntaxPosIsValid")
-        .allowlist_function("HuskSyntaxPosLine")
-        .allowlist_function("HuskSyntaxPosOffset")
-        .allowlist_function("HuskSyntaxQuote")
-        .allowlist_function("HuskSyntaxValidName")
+    bindgen::Builder::default()
+        .header("libhusk.h")
+        .allowlist_type("^Husk.*")
+        .allowlist_function("^Husk.*")
+        .blocklist_function("^HuskRust.*")
         .generate()
-        .unwrap();
-    bindings
+        .unwrap()
         .write_to_file(out_path.join("bindings.rs"))
         .unwrap();
 }
