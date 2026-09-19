@@ -1,4 +1,7 @@
 golang.org/x/exp v0.0.0-20230203172020-98cc5a0785f9 h1:frX3nT9RkKybPnjyI+yvZh6ZucTZatCCEm9D47sZ2zo=
 golang.org/x/exp v0.0.0-20230203172020-98cc5a0785f9/go.mod h1:CxIveKay+FTh1D0yPZemJVgC/95VzuuOLq5Qi4xnoYc=
+golang.org/x/exp v0.0.0-20260908205506-85c1c2202aba/go.mod h1:50RgIsmK7OwqzTTeqcSXQW8SswW0o8fRcDxmqGluJ8E=
 mvdan.cc/sh/v3 v3.6.0 h1:gtva4EXJ0dFNvl5bHjcUEvws+KRcDslT8VKheTYkbGU=
 mvdan.cc/sh/v3 v3.6.0/go.mod h1:U4mhtBLZ32iWhif5/lD+ygy1zrgaQhUu+XFy7C8+TTA=
+mvdan.cc/sh/v3 v3.14.1 h1:bXkhQWNHCs0KZEChF8hYS6FC+T2N9mUZLbQv9blditI=
+mvdan.cc/sh/v3 v3.14.1/go.mod h1:syYCoFET8w9tvevxiXUtY8/ICrU+l26jHmhJDra3Vwo=
